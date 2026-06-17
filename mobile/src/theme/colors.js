@@ -38,6 +38,14 @@ export const colors = {
   // Status
   verified: '#2563eb',
   verifiedBg: '#dbeafe',
+
+  // Shimmer / Loading
+  shimmer: '#e2e8f0',
+  shimmerHighlight: '#f1f5f9',
+
+  // Search
+  searchBg: '#f0f0ff',
+  suggestionHover: '#f5f3ff',
 };
 
 export default colors;

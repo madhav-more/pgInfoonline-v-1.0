@@ -3,16 +3,19 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 import HomeScreen from '../screens/home/HomeScreen';
-import SearchScreen from '../screens/search/SearchScreen';
+import { View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import WishlistScreen from '../screens/wishlist/WishlistScreen';
 import MyVisitsScreen from '../screens/visits/MyVisitsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+
+import SupportScreen from '../screens/support/SupportScreen';
 
 const Tab = createBottomTabNavigator();
 
 const tabConfig = {
   Home: { icon: 'home', activeIcon: 'home' },
-  Search: { icon: 'search-outline', activeIcon: 'search' },
+  Support: { icon: 'headset-outline', activeIcon: 'headset' },
   Wishlist: { icon: 'heart-outline', activeIcon: 'heart' },
   Visits: { icon: 'calendar-outline', activeIcon: 'calendar' },
   Profile: { icon: 'person-outline', activeIcon: 'person' },
@@ -49,7 +52,7 @@ export default function MainNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Search" component={SearchScreen} />
+      <Tab.Screen name="Support" component={SupportScreen} />
       <Tab.Screen name="Wishlist" component={WishlistScreen} />
       <Tab.Screen name="Visits" component={MyVisitsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />

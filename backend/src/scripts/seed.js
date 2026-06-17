@@ -4,7 +4,10 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User.model');
 const PG = require('../models/PG.model');
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pginfo';
+const MONGO_URI = "mongodb+srv://madhavmore23445_db_user:raghav123@cluster0.fgf42m2.mongodb.net/pgOnlineee"
+
+
+// process.env.MONGODB_URI || 'mongodb://localhost:27017/pginfo';
 
 const users = [
   { name: 'Super Admin', email: 'admin@pginfo.online', phone: '9999999999', password: 'Admin@123', role: 'admin' },

@@ -18,8 +18,8 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // ─── Security Middleware ──────────────────────────────────────────────────────
-app.use(helmet());
-app.use(mongoSanitize());
+// app.use(helmet());
+// app.use(mongoSanitize());
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 const limiter = rateLimit({

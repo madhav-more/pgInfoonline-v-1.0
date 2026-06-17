@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import Toast from 'react-native-toast-message';
@@ -40,10 +41,12 @@ export default function App() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider onLayout={onLayoutRootView}>
-      <StatusBar style="light" />
-      <AppNavigator />
-      <Toast />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider onLayout={onLayoutRootView}>
+        <StatusBar style="light" />
+        <AppNavigator />
+        <Toast />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

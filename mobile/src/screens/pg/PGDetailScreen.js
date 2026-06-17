@@ -40,7 +40,13 @@ export default function PGDetailScreen({ route, navigation }) {
 
   const toggleWishlist = async () => {
     try {
-      if (wishlisted) removeFromWishlist(pgId);
+      if (wishlisted){
+        removeFromWishlist(pgId);
+        await leadService.addLead(pgId, 'wishlist');
+
+      } 
+
+      
       else {
         addToWishlist({ pg: pgId });
         await leadService.addLead(pgId, 'wishlist');

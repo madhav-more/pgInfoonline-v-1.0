@@ -1,0 +1,484 @@
+Your first task is to deeply analyze and understand the following files:
+
+* `HomeScreen.js`
+* `SearchScreen.js`
+* `AIChatScreen.js`
+
+Also analyze all related files connected to these screens.
+
+After that, deeply analyze and understand the existing backend architecture, file structure, folder organization, APIs, and data flow.
+
+---
+
+## Feature 1 — HomeScreen UI & UX Enhancement
+
+We want to redesign and enhance the `HomeScreen` UI to make it truly best-in-class by following modern UI/UX principles and mobile performance best practices.
+
+### Requirements
+
+### 1. Smart Animated Search Bar
+
+* When the user scrolls upward, smoothly move the search bar to the top section.
+* Add premium animations and transitions.
+* Ensure the scrolling experience feels fluid, modern, and highly responsive.
+* The interaction should feel polished and production-ready.
+
+### 2. PG Image Carousel Enhancement
+
+Currently, only one image is displayed for each PG/property.
+
+We want to:
+
+* Support multiple images per property.
+* Allow horizontal image scrolling/swiping.
+* Show animated pagination dots (`...`) properly.
+* Add smooth transitions and gestures.
+* Make the carousel visually premium and highly optimized.
+
+### 3. HomeScreen Research & Optimization
+
+Conduct in-depth research on:
+
+* Modern mobile home screen experiences
+* Smooth scrolling behaviors
+* Sticky search patterns
+* High-performance list rendering
+* Premium animations and transitions
+* Best practices used in top-tier apps
+
+Then implement the most optimized and scalable solution.
+
+The final HomeScreen should be:
+
+* Smooth
+* Fully optimized
+* Highly responsive
+* Visually premium
+* Production-ready
+* Best-in-class in UI/UX
+
+---
+
+# Feature 2 — Advanced Search Functionality
+
+We want to completely redesign and upgrade the `HomeScreen` search experience and the entire `SearchScreen` functionality.
+
+## Requirements
+
+### 1. Dedicated Search Screen
+
+When the user clicks the search bar:
+
+* Open a completely new screen.
+* Add a proper back button.
+* Create a premium search-focused experience.
+
+### 2. Recent Searches
+
+At the top of the search screen:
+
+* Display recent searches.
+* Store and manage search history efficiently.
+* Allow quick re-selection of previous searches.
+
+### 3. Smart Recommendations
+
+When the user starts typing:
+
+* Show intelligent real-time recommendations.
+* Suggest the best matching properties/PGs.
+* Improve recommendation accuracy and relevance.
+* Ensure the suggestions appear instantly and smoothly.
+
+### 4. Advanced Filters
+
+Add best-in-class filtering functionality, including:
+
+* Price range
+* Location
+* Ratings
+* Amenities
+* Property type
+* Availability
+* Sorting options
+
+The filters should have:
+
+* Smooth UI interactions
+* Premium modal/bottom-sheet experience
+* Optimized state management
+* Fast filtering performance
+
+---
+
+# Search System Research & Optimization
+
+Conduct in-depth research on:
+
+* Modern search UX patterns
+* Search recommendation systems
+* Real-time search optimization
+* Mobile-first search experiences
+* Best practices used by top platforms
+
+Then implement the best possible architecture and UX.
+
+The search system should be:
+
+* Extremely fast
+* Intelligent
+* Smooth
+* Scalable
+* Highly optimized
+* Best-in-class in recommendation quality
+
+---
+
+# Implementation Guidelines
+
+While implementing these features:
+
+* Follow best-in-class coding practices.
+* Write clean, scalable, and maintainable code.
+* Ensure modular architecture and reusable components.
+* Keep the UI highly polished and production-ready.
+* Add proper loading states and animations.
+* Implement robust error handling everywhere.
+* Optimize rendering and performance.
+* Ensure smooth animations and interactions.
+* Follow modern React Native/mobile development best practices.
+* Keep everything fully responsive and optimized across devices.
+
+The final result should feel premium, modern, highly optimized, and best-in-class in every aspect.
+
+
+======
+
+PLAN
+
+
+=======
+
+
+# HomeScreen UI/UX Enhancement & Advanced Search System
+
+## Background & Analysis Summary
+
+### Current Architecture
+The app is a React Native (Expo SDK 54) mobile app with:
+- **Navigation**: `@react-navigation` with bottom tabs (`MainNavigator`) + root stack (`AppNavigator`) for PGDetail, AIChat, BookVisit
+- **State**: Zustand stores — `authStore`, `pgStore`, `wishlistStore`
+- **API**: Axios client → Express/MongoDB backend with Zod validation
+- **Existing Components**: `PGCard`, `SearchBar`, `FilterSheet`, `ImageCarousel`, `PGListItem`, `Skeleton`, `EmptyState`, `ScreenHeader`
+
+### Key Issues Identified
+1. **HomeScreen** uses plain `ScrollView` (not `Animated.ScrollView`) — no scroll-driven animations possible
+2. **PGCard** renders only the main photo via `<Image>` — no carousel, no swiping
+3. **SearchScreen** is a tab screen with inline search — not a dedicated focused experience
+4. **No recent searches** storage/display
+5. **No search recommendations** — no debounced autocomplete or suggestion API
+6. **FilterSheet** is basic — no price range slider, no sorting in the sheet
+7. **Skeleton** components have no pulse animation — static gray blocks
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Navigation Architecture Change**: The current `SearchScreen` is a bottom tab screen. This plan converts the tab's `Search` to navigate directly to a new **dedicated `SearchScreen`** (full-screen stack screen) when tapped. The bottom tab "Search" will become a lightweight gateway that immediately pushes the real search experience. This is how apps like Airbnb, OLX, and Swiggy handle search UX.
+
+> [!IMPORTANT]
+> **New Dependencies**: This plan requires `react-native-reanimated` (already installed v4.1.1), `react-native-gesture-handler` (already installed v2.28.0), `expo-haptics` (already installed), and `@react-native-async-storage/async-storage` (NEW — needed for persisting recent searches). No other new packages are needed.
+
+> [!WARNING]  
+> **Backend Addition**: A new lightweight `/api/v1/pg/suggestions` endpoint is proposed for real-time search suggestions (returns PG names + areas matching a prefix). This is a read-only endpoint and doesn't affect existing APIs.
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Price Range Slider**: Should the price filter use a custom-built dual-thumb slider (no new dependency, simpler but less polished), or should we add `@react-native-community/slider` for a native feel? I recommend the custom approach to avoid an extra dependency.
+
+> [!IMPORTANT]
+> **Image Carousel in PGCard**: Each PG can have multiple `photos[]`. Should the card carousel show all photos or cap at 5 max for performance? I recommend capping at 5.
+
+---
+
+## Proposed Changes
+
+### Component 1: Animated HomeScreen with Scroll-Driven Search Bar
+
+#### [MODIFY] [HomeScreen.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/screens/home/HomeScreen.js)
+
+Complete rewrite of HomeScreen with:
+
+- **Replace `ScrollView` with `Animated.FlatList`** from `react-native-reanimated` for virtualized, high-performance list rendering
+- **Animated sticky search bar**: Use `Animated.ScrollView` + `useAnimatedScrollHandler` from Reanimated to track scroll position. When user scrolls down, the gradient header collapses and the search bar sticks to the top with a smooth scale/opacity transition
+- **Search bar tap → navigates to dedicated SearchScreen** (no longer inline text input on HomeScreen — becomes a pressable "fake" search bar like Airbnb/Google Maps)
+- **FlatList with `ListHeaderComponent`** for the city selector + section header
+- **Pull-to-refresh** preserved with premium haptic feedback via `expo-haptics`
+- **Shimmer skeletons** via animated opacity loop (Reanimated `withRepeat`)
+
+Key animation behavior:
+```
+scrollY = 0       → Full gradient header visible, search bar at normal position
+scrollY > 60      → Header collapses, search bar slides to sticky top position  
+scrollY > 120     → City chips fade out, minimal header with only search bar
+```
+
+---
+
+### Component 2: PG Card Image Carousel
+
+#### [NEW] [PGCardCarousel.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/shared/PGCardCarousel.js)
+
+New component for inline image carousel within PGCard:
+
+- Horizontal `FlatList` with `pagingEnabled` + `snapToInterval` for smooth snap-scrolling
+- Animated pagination dots with scale/opacity transitions (active dot expands, inactive dots are small)
+- `getItemLayout` for instant scroll calculation (no measurement overhead)
+- Cap at 5 images max for card-level carousel
+- Lazy image loading with `expo-image` (already in dependencies) for better caching & blur-up placeholders
+- Photo counter badge (e.g., "3/5") in top-right corner
+
+#### [MODIFY] [Card.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/ui/Card.js)
+
+- Replace the single `<Image>` in `PGCard` with the new `<PGCardCarousel>` component
+- Keep the verified badge and wishlist overlay positioned over the carousel
+
+---
+
+### Component 3: Enhanced Skeleton with Shimmer Animation
+
+#### [MODIFY] [Skeleton.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/ui/Skeleton.js)
+
+- Add shimmer/pulse animation using Reanimated `useSharedValue` + `withRepeat(withTiming(...))` 
+- Animated opacity oscillation from 0.3 → 0.7 → 0.3 for premium loading feel
+- Gradient shimmer effect across the skeleton surface
+
+---
+
+### Component 4: Dedicated Search Screen (Full Overhaul)
+
+#### [NEW] [searchStore.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/store/searchStore.js)
+
+New Zustand store for search state management:
+
+```javascript
+{
+  recentSearches: [],       // Persisted via AsyncStorage
+  suggestions: [],          // Real-time autocomplete suggestions
+  searchResults: [],        // Current search results
+  filters: {},              // Active filters
+  sortBy: 'newest',         // Sort option
+  isSearching: false,       // Loading state
+  
+  // Actions
+  addRecentSearch(query),
+  removeRecentSearch(query),
+  clearRecentSearches(),
+  loadRecentSearches(),     // Hydrate from AsyncStorage
+  setSuggestions(list),
+  setSearchResults(results),
+  setFilters(filters),
+  setSortBy(sort),
+}
+```
+
+#### [MODIFY] [SearchScreen.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/screens/search/SearchScreen.js)
+
+Complete redesign as a full-screen dedicated search experience:
+
+**Layout Structure:**
+1. **Top Section**: Back button + auto-focused search input + cancel button
+2. **Recent Searches Section**: Horizontal scrollable chips with clock icon, tap to re-search, long-press to delete, "Clear All" button
+3. **Suggestions Section** (appears when typing): Real-time autocomplete list with highlighted matching text, grouped by type (PG names, Areas, Cities)
+4. **Results Section** (after search submit): FlatList with `PGListItem` + active filter chips at top + sort button
+5. **Quick Filter Bar**: Horizontally scrollable filter chips (Price, Location, Rating, Amenities, etc.) — tapping opens the enhanced FilterSheet
+
+**Animations:**
+- Search input auto-focuses with keyboard slide-up animation
+- Recent searches section fades in on mount
+- Suggestions list items stagger-animate in
+- Results appear with fade-up micro-animation
+- Filter chips have spring press animation
+
+#### [NEW] [SearchSuggestionItem.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/shared/SearchSuggestionItem.js)
+
+Suggestion row component:
+- Icon (search/location/building based on type)
+- Text with highlighted matching substring (bold)
+- Subtitle showing category (Area, PG Name, etc.)
+- Arrow icon for "fill search bar" action
+
+#### [NEW] [RecentSearchChip.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/shared/RecentSearchChip.js)
+
+Recent search chip component:
+- Clock icon + search text + X button to remove
+- Tap to populate search bar and execute
+- Animated removal with layout animation
+
+---
+
+### Component 5: Enhanced Filter System
+
+#### [MODIFY] [FilterSheet.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/shared/FilterSheet.js)
+
+Major enhancements:
+
+1. **Price Range Slider**: Custom dual-thumb slider component for min/max rent (₹2,000 – ₹30,000 range)
+2. **Sort Options Section**: Newest, Price Low→High, Price High→Low, Most Popular — radio-style selection
+3. **Amenities Filter**: Chips for WiFi, Laundry, Parking, Gym, CCTV, etc. (multi-select)
+4. **Availability Toggle**: "Available Only" switch
+5. **Active Filters Count Badge** on the filter button
+6. **Smooth animations**: Sheet slides up with spring physics, content fades in staggered
+7. **Haptic feedback** on chip selection
+
+#### [NEW] [PriceRangeSlider.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/components/ui/PriceRangeSlider.js)
+
+Custom dual-thumb price range slider:
+- Two draggable thumbs on a track
+- Active range highlighted with gradient fill
+- Real-time price labels above each thumb (₹5,000 — ₹15,000)
+- Built with `react-native-gesture-handler` PanGestureHandler + Reanimated
+- Haptic feedback on thumb grab/release
+- Step increments of ₹500
+
+---
+
+### Component 6: Navigation Changes
+
+#### [MODIFY] [AppNavigator.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/navigation/AppNavigator.js)
+
+Add the new dedicated `SearchScreen` as a stack screen with `slide_from_bottom` animation (same pattern as AIChat):
+```javascript
+<Stack.Screen name="SearchDedicated" component={SearchScreen} 
+  options={{ animation: 'slide_from_bottom' }} />
+```
+
+#### [MODIFY] [MainNavigator.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/navigation/MainNavigator.js)
+
+Replace the Search tab screen with a lightweight `SearchTabGateway` component that immediately navigates to the dedicated search stack screen on focus. This keeps the tab bar visible but provides the full-screen search experience.
+
+---
+
+### Component 7: Backend — Search Suggestions API
+
+#### [NEW] [suggestions endpoint in pg.controller.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/backend/src/controllers/pg.controller.js)
+
+New `getSuggestions` controller:
+```javascript
+// GET /api/v1/pg/suggestions?q=hin
+// Returns: { suggestions: [{ text: "Hinjewadi", type: "area" }, { text: "Hindustan PG", type: "pg_name" }] }
+```
+
+- Searches PG `name` and `area` fields with prefix regex match
+- Groups results by type (area vs pg_name)
+- Returns max 10 suggestions
+- Fast — uses existing text index + lean queries
+- Debounced on client side (300ms)
+
+#### [MODIFY] [pg.routes.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/backend/src/routes/v1/pg.routes.js)
+
+Add route: `router.get('/suggestions', getSuggestions);`
+
+#### [MODIFY] [pg.service.js (backend)](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/backend/src/services/pg.service.js)
+
+Add `getSuggestions(query)` method:
+- Aggregation pipeline: match prefix on name/area, group by type, limit 10
+- Returns deduplicated area names + PG names matching the prefix
+
+#### [MODIFY] [pg.service.js (mobile)](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/services/pg.service.js)
+
+Add `getSuggestions(query)` API call to the mobile service layer.
+
+---
+
+### Component 8: Theme & Utility Additions
+
+#### [MODIFY] [colors.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/theme/colors.js)
+
+Add new colors:
+```javascript
+shimmer: '#e2e8f0',          // Shimmer base
+shimmerHighlight: '#f1f5f9', // Shimmer sweep
+searchBg: '#f0f0ff',        // Search screen background
+suggestionHover: '#f5f3ff',  // Suggestion highlight
+```
+
+#### [NEW] [useDebounce.js](file:///Users/madhavmore/Downloads/webdevelopement/basic-projects-setuped-for-ready/web/WORKN-AI/worknai-pgonline/mobile/src/utils/useDebounce.js)
+
+Custom hook for debounced search input:
+```javascript
+export function useDebounce(value, delay = 300) { ... }
+```
+
+---
+
+## Implementation Order
+
+| Phase | Items | Estimated Complexity |
+|-------|-------|---------------------|
+| **1. Foundation** | Theme updates, `useDebounce` hook, install AsyncStorage | Low |
+| **2. Skeleton Enhancement** | Shimmer animation in `Skeleton.js` | Low |
+| **3. PGCard Carousel** | `PGCardCarousel.js` + modify `Card.js` | Medium |
+| **4. HomeScreen Rewrite** | Animated scroll, sticky search bar, FlatList conversion | High |
+| **5. Search Store** | `searchStore.js` with AsyncStorage persistence | Medium |
+| **6. Backend Suggestions API** | New endpoint + service method | Low |
+| **7. Dedicated Search Screen** | Full redesign + suggestion/recent components | High |
+| **8. Enhanced Filters** | Price range slider, sort, amenities, FilterSheet upgrade | High |
+| **9. Navigation Wiring** | Stack screen registration, tab gateway | Low |
+| **10. Polish & Testing** | Animations tuning, edge cases, performance profiling | Medium |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- No existing test framework detected in the project. Verification will be manual.
+
+### Manual Verification
+1. **HomeScreen scroll animation**: Verify search bar smoothly transitions to sticky position on scroll, with no jank or frame drops
+2. **PGCard carousel**: Swipe through images, verify pagination dots animate correctly, verify lazy loading works
+3. **Skeleton shimmer**: Confirm pulse animation runs during all loading states
+4. **Search flow**: Tap search bar → verify navigation to dedicated screen → verify auto-focus → type → verify suggestions appear within 300ms debounce → submit → verify results
+5. **Recent searches**: Search something → go back → re-open search → verify it appears in recents → kill app → reopen → verify persistence
+6. **Filters**: Open filter sheet → adjust price slider → select amenities → apply → verify results filter correctly → verify filter count badge
+7. **Performance**: Profile with React DevTools — verify FlatList renders only visible items, no unnecessary re-renders
+8. **Edge cases**: Empty search, no results, network error states, very long PG names, PGs with 0 photos, PGs with 10+ photos
+
+
+====
+WALKTHROUGH
+====
+# Implementation Walkthrough
+
+I've completed the implementation of both the **HomeScreen UI/UX Enhancements** and the **Advanced Search System** according to the approved plan. All 10 phases have been executed.
+
+Here is a summary of the major changes and new features:
+
+## 1. HomeScreen UI & UX Enhancements
+
+*   **Animated Sticky Search Bar:** The HomeScreen has been completely rewritten using `react-native-reanimated` (`Animated.FlatList`). As you scroll down, the gradient header smoothly collapses, fading out the greeting and city chips, while the search bar remains sticky at the top, ensuring it's always accessible.
+*   **PG Image Carousel:** Replaced the single image in `PGCard` with a new `PGCardCarousel` component. It uses a paginated `FlatList` with animated pagination dots (the active dot expands smoothly) and a photo counter badge. It caps at 5 images for optimal performance and uses `expo-image` for lazy loading and blur-up placeholders.
+*   **Shimmer Skeletons:** Upgraded the static gray loading skeletons to use a smooth, breathing shimmer pulse animation using Reanimated (`withRepeat` and `withTiming`), providing a much more premium feel during loading states.
+*   **Performance Optimization:** Converted the main layout to use `Animated.FlatList` with `ListHeaderComponent` and added performance props like `removeClippedSubviews`, `maxToRenderPerBatch`, and `windowSize` to ensure smooth scrolling even with many PGs.
+*   **Haptics:** Added subtle haptic feedback (using `expo-haptics`) to pull-to-refresh, city selection, and wishlist toggling.
+
+## 2. Advanced Search Functionality
+
+*   **Dedicated Search Screen:** The search tab now acts as a gateway that immediately pushes a dedicated, full-screen `SearchScreen` stack. This provides a focused search experience without the bottom tab bar getting in the way.
+*   **Recent Searches:** Implemented a new `searchStore` using Zustand and `@react-native-async-storage/async-storage`. It saves your recent search queries locally (up to 10) so they persist across app restarts. They appear as chips on the search screen before you start typing.
+*   **Smart Autocomplete Suggestions:** 
+    *   **Backend:** Added a new lightweight `/api/v1/pg/suggestions` endpoint that performs a prefix search on both PG names and areas, returning grouped and deduplicated results.
+    *   **Frontend:** Created a `useDebounce` hook (300ms) to prevent excessive API calls while typing. As you type, suggestions appear below the search bar, categorized by 'Area' or 'PG Name'. Tapping a suggestion immediately executes the search.
+*   **Enhanced Filters:**
+    *   **Price Range Slider:** Built a completely custom, dual-thumb price range slider (`PriceRangeSlider.js`) using `react-native-gesture-handler` and Reanimated. It snaps to ₹500 increments and provides haptic feedback as you drag the thumbs.
+    *   **Sort Options:** Added a "Sort By" section in the filter sheet (Newest, Price Low/High, Most Popular).
+    *   **Filter Sheet Animation:** Rewrote `FilterSheet.js` to slide up smoothly using Reanimated spring physics instead of a basic React Native Modal slide. Added an active filter count badge to the filter button.
+
+## Next Steps
+
+You can now start your mobile app (`npm run ios` or `npm run android` in the `mobile` folder) and test these new features. 
+
+> [!TIP]
+> Try scrolling on the HomeScreen to see the sticky header animation, swipe through the images on a PG Card, and tap the search bar to experience the new dedicated search flow with suggestions and recent history.

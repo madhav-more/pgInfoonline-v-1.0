@@ -1,12 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  RefreshControl, TouchableOpacity
+  View, Text, StyleSheet, TouchableOpacity,
+  RefreshControl, FlatList, Dimensions, Platform,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolation,
+  withSpring,
+  withTiming,
+  Easing,
+  runOnJS,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 
 import colors from '../../theme/colors';
 import spacing from '../../theme/spacing';
@@ -16,14 +28,22 @@ import useWishlistStore from '../../store/wishlistStore';
 import pgService from '../../services/pg.service';
 import leadService from '../../services/lead.service';
 
-import { PGCard, PGCardSkeleton } from '../../components/ui/Card';
+import { PGCard } from '../../components/ui/Card';
+import { PGCardSkeleton } from '../../components/ui/Skeleton';
 import Avatar from '../../components/ui/Avatar';
-import SearchBar from '../../components/ui/SearchBar';
 import WishlistButton from '../../components/shared/WishlistButton';
 import { SectionHeader } from '../../components/shared/CommonUI';
 import FilterSheet from '../../components/shared/FilterSheet';
 
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 const CITIES = ['Pune', 'Mumbai', 'Delhi'];
+const HEADER_MAX_HEIGHT = 200;
+const HEADER_MIN_HEIGHT = 100;
+const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+const SEARCH_BAR_COLLAPSE_START = 30;
+const SEARCH_BAR_COLLAPSE_END = 100;
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -34,19 +54,27 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
-  const [searchQ, setSearchQ] = useState('');
   const [selectedCity, setSelectedCity] = useState(CITIES[0]);
 
+  // ─── Animated Values ──────────────────────────────────────────────
+  const scrollY = useSharedValue(0);
+  const searchBarScale = useSharedValue(1);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  // ─── Data Loading ─────────────────────────────────────────────────
   const loadData = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     else setRefreshing(true);
 
     try {
-      // Load PGs for selected city
       const pgData = await pgService.getAll({ ...filters, city: selectedCity, limit: 10 });
       setPGs(pgData.pgs, pgData.pagination);
 
-      // Load Wishlist once
       if (!isRefresh) {
         const wlData = await leadService.getMyWishlist();
         setWishlist(wlData);
@@ -65,128 +93,304 @@ export default function HomeScreen({ navigation }) {
     }, [selectedCity, filters])
   );
 
+  const handleRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    loadData(true);
+  }, [selectedCity, filters]);
+
   const toggleWishlist = async (pgId) => {
     try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (isWishlisted(pgId)) {
         removeFromWishlist(pgId);
-        // Backend removal isn't explicitly defined in lead.service yet, skipping for MVP UI speed
       } else {
         addToWishlist({ pg: pgId });
-        await leadService.addLead(pgId, 'wishlist');
       }
+      // Backend handles add/remove toggle dynamically
+      await leadService.addLead(pgId, 'wishlist');
     } catch (err) {
       console.log('Wishlist error:', err);
     }
   };
 
-  const handleSearch = () => {
-    if (searchQ.trim()) {
-      navigation.navigate('Search', { initialQuery: searchQ });
-    }
-  };
+  const handleSearchPress = useCallback(() => {
+    // Animate press feedback
+    searchBarScale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
+    setTimeout(() => {
+      searchBarScale.value = withSpring(1, { damping: 15, stiffness: 400 });
+      navigation.navigate('SearchDedicated');
+    }, 80);
+  }, [navigation]);
 
   const activeFiltersCount = Object.keys(filters).length;
 
+  // ─── Animated Styles ──────────────────────────────────────────────
+
+  // Header gradient collapse animation (Absolute positioning to prevent FlatList thrashing)
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const headerHeight = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [HEADER_MAX_HEIGHT + insets.top, HEADER_MIN_HEIGHT + insets.top],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      height: headerHeight,
+      overflow: 'hidden',
+    };
+  });
+
+  // Greeting text fade out on scroll
+  const greetingAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, 50],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    const translateY = interpolate(
+      scrollY.value,
+      [0, 50],
+      [0, -15],
+      Extrapolation.CLAMP
+    );
+
+    return { opacity, transform: [{ translateY }] };
+  });
+
+  // City chips fade out on scroll
+  const cityChipsAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, SEARCH_BAR_COLLAPSE_START, SEARCH_BAR_COLLAPSE_END],
+      [1, 0.6, 0],
+      Extrapolation.CLAMP
+    );
+    const height = interpolate(
+      scrollY.value,
+      [0, SEARCH_BAR_COLLAPSE_END],
+      [44, 0],
+      Extrapolation.CLAMP
+    );
+
+    return { opacity, height, overflow: 'hidden' };
+  });
+
+  // Search bar stays visible, moves up, and scales slightly when at top
+  const searchBarAnimatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(
+      scrollY.value,
+      [0, SEARCH_BAR_COLLAPSE_END],
+      [1, 0.96],
+      Extrapolation.CLAMP
+    );
+    const translateY = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [0, -45], // Move up to cover the fading greeting row
+      Extrapolation.CLAMP
+    );
+
+    return {
+      transform: [
+        { translateY },
+        { scale: scale * searchBarScale.value }
+      ],
+    };
+  });
+
+  // Avatar fade
+  const avatarAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, 40],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
+  });
+
+  // ─── FlatList Components ──────────────────────────────────────────
+
+  const ListHeader = useMemo(() => (
+    <View style={styles.listHeader}>
+      <SectionHeader
+        title={`Top PGs in ${selectedCity}`}
+        actionText={activeFiltersCount > 0 ? 'Clear Filters' : 'See All'}
+        onAction={() => activeFiltersCount > 0 ? clearFilters() : navigation.navigate('SearchDedicated')}
+      />
+    </View>
+  ), [selectedCity, activeFiltersCount]);
+
+  const ListFooter = useMemo(() => (
+    <TouchableOpacity style={styles.aiBanner} onPress={() => navigation.navigate('AIChat')} activeOpacity={0.9}>
+      <LinearGradient
+        colors={['#8b5cf6', '#6d28d9']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.aiGradient}
+      >
+        <View style={styles.aiIconWrapper}>
+          <Ionicons name="sparkles" size={24} color="#8b5cf6" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Try AI Search</Text>
+          <Text style={styles.aiSub}>Tell us exactly what you need</Text>
+        </View>
+        <Ionicons name="arrow-forward-circle" size={28} color="#fff" />
+      </LinearGradient>
+    </TouchableOpacity>
+  ), []);
+
+  const EmptyComponent = useMemo(() => (
+    <View style={styles.empty}>
+      <View style={styles.emptyIconWrapper}>
+        <Ionicons name="home-outline" size={40} color={colors.textMuted} />
+      </View>
+      <Text style={styles.emptyTitle}>No PGs found</Text>
+      <Text style={styles.emptyText}>Try changing your city or adjusting filters</Text>
+    </View>
+  ), []);
+
+  const LoadingComponent = useMemo(() => (
+    <>
+      <PGCardSkeleton />
+      <PGCardSkeleton />
+      <PGCardSkeleton />
+    </>
+  ), []);
+
+  const renderPGCard = useCallback(({ item: pg }) => (
+    <PGCard
+      pg={pg}
+      onPress={() => navigation.navigate('PGDetail', { pgId: pg._id })}
+      style={{ marginBottom: 16 }}
+      rightAction={
+        <WishlistButton
+          isWishlisted={isWishlisted(pg._id)}
+          onPress={() => toggleWishlist(pg._id)}
+        />
+      }
+    />
+  ), [isWishlisted, wishlist]);
+
+  const keyExtractor = useCallback((item) => item._id, []);
+
+  // ─── Render ───────────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
-      {/* Custom Header */}
-      <LinearGradient colors={[colors.gradientStart, colors.gradientMid]} style={{ paddingTop: insets.top }}>
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
-            <Text style={styles.subGreeting}>Find your next home</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-            <Avatar name={user?.name} size="sm" color="rgba(255,255,255,0.2)" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <SearchBar
-            value={searchQ}
-            onChangeText={setSearchQ}
-            placeholder="Search by area, PG name..."
-            onSubmit={handleSearch}
-            onFilterPress={() => setShowFilter(true)}
-            showFilter
-          />
-        </View>
-
-        {/* City Selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cityScroll}>
-          {CITIES.map((city) => (
-            <TouchableOpacity
-              key={city}
-              style={[styles.cityChip, selectedCity === city && styles.cityChipActive]}
-              onPress={() => setSelectedCity(city)}
-            >
-              <Ionicons name="location" size={12} color={selectedCity === city ? colors.primary : '#fff'} />
-              <Text style={[styles.cityText, selectedCity === city && styles.cityTextActive]}>
-                {city}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </LinearGradient>
-
-      {/* Main Content */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={colors.primary} />}
-      >
-        <SectionHeader
-          title={`Top PGs in ${selectedCity}`}
-          actionText={activeFiltersCount > 0 ? 'Clear Filters' : 'See All'}
-          onAction={() => activeFiltersCount > 0 ? clearFilters() : navigation.navigate('Search')}
-        />
-
-        {loading ? (
-          <>
-            <PGCardSkeleton />
-            <PGCardSkeleton />
-          </>
-        ) : pgs.length === 0 ? (
-          <View style={styles.empty}>
-            <Ionicons name="home-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No PGs found in this area</Text>
-          </View>
-        ) : (
-          pgs.map((pg) => (
-            <PGCard
-              key={pg._id}
-              pg={pg}
-              onPress={() => navigation.navigate('PGDetail', { pgId: pg._id })}
-              style={{ marginBottom: 16 }}
-              rightAction={
-                <WishlistButton
-                  isWishlisted={isWishlisted(pg._id)}
-                  onPress={() => toggleWishlist(pg._id)}
-                />
-              }
-            />
-          ))
-        )}
-
-        {/* AI Banner */}
-        <TouchableOpacity style={styles.aiBanner} onPress={() => navigation.navigate('AIChat')} activeOpacity={0.9}>
-          <LinearGradient
-            colors={['#8b5cf6', '#6d28d9']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.aiGradient}
-          >
-            <View style={styles.aiIconWrapper}>
-              <Ionicons name="sparkles" size={24} color="#8b5cf6" />
-            </View>
+      {/* Animated Gradient Header */}
+      <Animated.View style={headerAnimatedStyle}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientMid]}
+          style={[styles.gradientHeader, { paddingTop: insets.top }]}
+        >
+          {/* Top Row: Greeting + Avatar */}
+          <Animated.View style={[styles.header, greetingAnimatedStyle]}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.aiTitle}>Try AI Search</Text>
-              <Text style={styles.aiSub}>Tell us exactly what you need</Text>
+              <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
+              <Text style={styles.subGreeting}>Find your next home</Text>
             </View>
-            <Ionicons name="arrow-forward-circle" size={28} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
-      </ScrollView>
+            <Animated.View style={avatarAnimatedStyle}>
+              <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+                <Avatar name={user?.name} size="sm" color="rgba(255,255,255,0.2)" />
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+
+          {/* Search Bar — Pressable, navigates to dedicated search */}
+          <Animated.View style={[styles.searchContainer, searchBarAnimatedStyle]}>
+            <TouchableOpacity
+              style={styles.fakeSearchBar}
+              onPress={handleSearchPress}
+              activeOpacity={0.85}
+            >
+              <View style={styles.fakeSearchInner}>
+                <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+                <Text style={styles.fakeSearchText}>Search by area, PG name...</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.filterBtn}
+                onPress={() => setShowFilter(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="options-outline" size={18} color={colors.primary} />
+                {activeFiltersCount > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* City Selector Chips */}
+          <Animated.View style={cityChipsAnimatedStyle}>
+            <Animated.ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cityScroll}
+            >
+              {CITIES.map((city) => (
+                <TouchableOpacity
+                  key={city}
+                  style={[styles.cityChip, selectedCity === city && styles.cityChipActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedCity(city);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="location" size={12} color={selectedCity === city ? colors.primary : '#fff'} />
+                  <Text style={[styles.cityText, selectedCity === city && styles.cityTextActive]}>
+                    {city}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </Animated.ScrollView>
+          </Animated.View>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Main Content — Virtualized FlatList */}
+      {loading ? (
+        <View style={[styles.content, { paddingTop: HEADER_MAX_HEIGHT + insets.top + 20 }]}>{LoadingComponent}</View>
+      ) : (
+        <AnimatedFlatList
+          style={styles.list}
+          data={pgs}
+          renderItem={renderPGCard}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={[styles.content, { paddingTop: HEADER_MAX_HEIGHT + insets.top + 16 }]}
+          scrollIndicatorInsets={{ top: HEADER_MAX_HEIGHT + insets.top }}
+          showsVerticalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
+          ListEmptyComponent={EmptyComponent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              progressViewOffset={HEADER_MAX_HEIGHT + insets.top + 10}
+            />
+          }
+          // Performance optimizations
+          removeClippedSubviews={Platform.OS !== 'web'}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          initialNumToRender={4}
+          updateCellsBatchingPeriod={50}
+        />
+      )}
 
       {/* Filter Modal */}
       <FilterSheet
@@ -201,14 +405,59 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  gradientHeader: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.screenPadding, paddingBottom: 16, paddingTop: 10,
+    paddingHorizontal: spacing.screenPadding, paddingBottom: 10, paddingTop: 8,
   },
   greeting: { fontSize: 22, fontWeight: '800', color: '#fff' },
   subGreeting: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  searchContainer: { paddingHorizontal: spacing.screenPadding, paddingBottom: 16 },
-  cityScroll: { paddingHorizontal: spacing.screenPadding, paddingBottom: 16, gap: 10 },
+
+  // Search Bar (Pressable Fake)
+  searchContainer: { paddingHorizontal: spacing.screenPadding, paddingBottom: 12 },
+  fakeSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  fakeSearchInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: spacing.borderRadius,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    height: 46,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  fakeSearchText: {
+    fontSize: 15,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  filterBtn: {
+    width: 46, height: 46,
+    borderRadius: spacing.borderRadius,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute', top: -4, right: -4,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  filterBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  // City Chips
+  cityScroll: { paddingHorizontal: spacing.screenPadding, paddingBottom: 12, gap: 10 },
   cityChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingVertical: 6, paddingHorizontal: 14,
@@ -219,9 +468,24 @@ const styles = StyleSheet.create({
   cityChipActive: { backgroundColor: '#fff', borderColor: '#fff' },
   cityText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   cityTextActive: { color: colors.primary },
+
+  // Content
+  list: { flex: 1 },
   content: { padding: spacing.screenPadding, paddingBottom: 40 },
-  empty: { alignItems: 'center', paddingVertical: 40 },
-  emptyText: { fontSize: 15, color: colors.textMuted, marginTop: 12 },
+  listHeader: { marginBottom: 4 },
+
+  // Empty State
+  empty: { alignItems: 'center', paddingVertical: 48 },
+  emptyIconWrapper: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
+
+  // AI Banner
   aiBanner: {
     marginTop: 8, marginBottom: 20,
     borderRadius: 16, overflow: 'hidden',

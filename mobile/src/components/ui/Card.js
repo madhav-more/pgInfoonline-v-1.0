@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../theme/colors';
 import spacing from '../../theme/spacing';
 import Badge from './Badge';
+import PGCardCarousel from '../shared/PGCardCarousel';
 
 /**
  * Reusable Card component for generic content
@@ -26,13 +27,13 @@ export function Card({ children, onPress, style }) {
 
 /**
  * PG Listing Card — used across Home, Search, Wishlist
+ * Now features multi-image carousel with animated pagination dots.
  * @param {object} pg - PG data object
  * @param {function} onPress
  * @param {boolean} showStatus
  * @param {React.ReactNode} rightAction - E.g. wishlist button
  */
 export function PGCard({ pg, onPress, showStatus = false, rightAction, style }) {
-  const mainPhoto = pg.photos?.find((p) => p.isMain) || pg.photos?.[0];
   const minRent = Math.min(
     pg.rent?.single || Infinity,
     pg.rent?.double || Infinity,
@@ -40,14 +41,10 @@ export function PGCard({ pg, onPress, showStatus = false, rightAction, style }) 
   );
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[styles.pgCard, style]}>
-      {/* Image */}
+    <View style={[styles.pgCard, style]}>
+      {/* Image Carousel */}
       <View style={styles.pgImageContainer}>
-        <Image
-          source={{ uri: mainPhoto?.url || 'https://via.placeholder.com/400x200?text=PG' }}
-          style={styles.pgImage}
-          resizeMode="cover"
-        />
+        <PGCardCarousel photos={pg.photos || []} height={180} onPress={onPress} />
         {pg.isVerified && (
           <View style={styles.verifiedBadge}>
             <Ionicons name="shield-checkmark" size={12} color="#fff" />
@@ -58,7 +55,8 @@ export function PGCard({ pg, onPress, showStatus = false, rightAction, style }) 
       </View>
 
       {/* Body */}
-      <View style={styles.pgBody}>
+      <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+        <View style={styles.pgBody}>
         <View style={styles.pgHeader}>
           <Text style={styles.pgName} numberOfLines={1}>{pg.name}</Text>
           {showStatus && <Badge text={pg.status} variant={pg.status} size="sm" />}
@@ -90,8 +88,9 @@ export function PGCard({ pg, onPress, showStatus = false, rightAction, style }) 
             )}
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -113,23 +112,22 @@ const styles = StyleSheet.create({
     borderRadius: spacing.borderRadiusLg,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
   pgImageContainer: { position: 'relative' },
-  pgImage: { width: '100%', height: 160, backgroundColor: colors.surfaceAlt },
   verifiedBadge: {
-    position: 'absolute', top: 10, left: 10,
+    position: 'absolute', top: 10, left: 10, zIndex: 5,
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: colors.verified, borderRadius: 8,
     paddingVertical: 4, paddingHorizontal: 8,
   },
   verifiedText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  rightAction: { position: 'absolute', top: 10, right: 10 },
+  rightAction: { position: 'absolute', top: 10, right: 10, zIndex: 5 },
   pgBody: { padding: 14 },
   pgHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',

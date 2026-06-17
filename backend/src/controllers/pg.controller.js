@@ -107,4 +107,14 @@ const getMyPGs = asyncHandler(async (req, res) => {
   successResponse(res, 'Your listings retrieved', { pgs });
 });
 
-module.exports = { getPGs, getPGById, createPG, updatePG, deletePG, getMyPGs, aiSearch };
+/**
+ * @route GET /api/v1/pg/suggestions
+ * Gets real-time suggestions for search bar
+ */
+const getSuggestions = asyncHandler(async (req, res) => {
+  const { q } = req.query;
+  const result = await pgService.getSuggestions(q);
+  successResponse(res, 'Suggestions retrieved', result);
+});
+
+module.exports = { getPGs, getPGById, createPG, updatePG, deletePG, getMyPGs, aiSearch, getSuggestions };

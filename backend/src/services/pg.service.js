@@ -154,4 +154,46 @@ const aiSearchPGs = async (intentParams) => {
     .lean();
 };
 
-module.exports = { getPGs, getPGById, createPG, updatePG, deletePG, aiSearchPGs, buildSearchQuery };
+/**
+ * Get real-time autocomplete suggestions for search
+ */
+const getSuggestions = async (query) => {
+  if (!query || query.length < 2) return { suggestions: [] };
+
+  const regex = new RegExp(query, 'i');
+
+  // Search by name and area
+  const pgs = await PG.find({
+    $or: [
+      { name: regex },
+      { area: regex }
+    ],
+    status: 'approved'
+  })
+    .select('name area city')
+    .limit(10)
+    .lean();
+
+  const suggestionsMap = new Map();
+
+  pgs.forEach(pg => {
+    // Check if area matches
+    if (regex.test(pg.area)) {
+      const key = `area:${pg.area}`;
+      if (!suggestionsMap.has(key)) {
+        suggestionsMap.set(key, { text: pg.area, type: 'area', city: pg.city });
+      }
+    }
+    // Check if name matches
+    if (regex.test(pg.name)) {
+      const key = `pg_name:${pg.name}`;
+      if (!suggestionsMap.has(key)) {
+        suggestionsMap.set(key, { text: pg.name, type: 'pg_name', pgId: pg._id });
+      }
+    }
+  });
+
+  return { suggestions: Array.from(suggestionsMap.values()).slice(0, 10) };
+};
+
+module.exports = { getPGs, getPGById, createPG, updatePG, deletePG, aiSearchPGs, buildSearchQuery, getSuggestions };

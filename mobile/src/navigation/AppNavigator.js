@@ -7,6 +7,7 @@ import MainNavigator from './MainNavigator';
 import PGDetailScreen from '../screens/pg/PGDetailScreen';
 import AIChatScreen from '../screens/search/AIChatScreen';
 import BookVisitScreen from '../screens/visits/BookVisitScreen';
+import SearchScreen from '../screens/search/SearchScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +26,7 @@ export default function AppNavigator() {
         {isAuthenticated ? (
           <Stack.Group>
             <Stack.Screen name="Main" component={MainNavigator} />
+            <Stack.Screen name="SearchDedicated" component={SearchScreen} options={{ headerShown: false, animation: 'slide_from_bottom' }} />
             <Stack.Screen name="PGDetail" component={PGDetailScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
             <Stack.Screen name="AIChat" component={AIChatScreen} options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="BookVisit" component={BookVisitScreen} options={{ animation: 'slide_from_right' }} />

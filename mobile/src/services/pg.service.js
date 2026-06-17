@@ -13,6 +13,10 @@ export const pgService = {
     const res = await api.get('/pg/ai-search', { params: { q: query } });
     return res.data.data;
   },
+  getSuggestions: async (query) => {
+    const res = await api.get('/pg/suggestions', { params: { q: query } });
+    return res.data.data.suggestions;
+  },
 };
 
 export default pgService;

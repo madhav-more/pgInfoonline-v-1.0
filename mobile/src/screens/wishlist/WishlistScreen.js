@@ -28,8 +28,13 @@ export default function WishlistScreen({ navigation }) {
   useFocusEffect(useCallback(() => { loadWishlist(); }, []));
 
   const handleRemove = async (pgId) => {
-    removeFromWishlist(pgId);
-    // Note: Backend removal would go here in a full implementation
+    try {
+      removeFromWishlist(pgId);
+      // Backend toggle removes the wishlist lead
+      await leadService.addLead(pgId, 'wishlist');
+    } catch (error) {
+      console.log('Failed to remove from backend', error);
+    }
   };
 
   return (
@@ -38,7 +43,7 @@ export default function WishlistScreen({ navigation }) {
 
       <FlatList
         data={wishlist}
-        keyExtractor={(i) => i._id}
+        keyExtractor={(item, index) => item._id || item.pg?._id || item.pg || `wl-${index}`}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
