@@ -14,10 +14,24 @@ const buildSearchQuery = (params) => {
   if (params.isVerified !== undefined) query.isVerified = params.isVerified === 'true';
 
   // Rent range filter
-  if (params.minRent || params.maxRent) {
+  if (params.minRent !== undefined || params.maxRent !== undefined) {
     const rentCondition = {};
-    if (params.minRent) rentCondition.$gte = params.minRent;
-    if (params.maxRent) rentCondition.$lte = params.maxRent;
+    
+    // Parse numeric values safely
+    const parseRent = (val) => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') {
+        const num = parseInt(val.replace(/\D/g, ''), 10);
+        return isNaN(num) ? undefined : num;
+      }
+      return undefined;
+    };
+
+    const min = parseRent(params.minRent);
+    const max = parseRent(params.maxRent);
+
+    if (min !== undefined) rentCondition.$gte = min;
+    if (max !== undefined) rentCondition.$lte = max;
 
     if (params.sharingType === 'single') query['rent.single'] = rentCondition;
     else if (params.sharingType === 'double') query['rent.double'] = rentCondition;

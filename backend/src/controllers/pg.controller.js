@@ -32,28 +32,32 @@ const aiSearch = asyncHandler(async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: `You are a PG search assistant. Extract search parameters from user queries about PG accommodations in India.
-Return ONLY a valid JSON object with these optional fields:
-- city: "Pune" | "Mumbai" | "Delhi"
+            content: `You are a strict JSON extraction assistant for PG searches in India. Extract search parameters from user queries.
+Return ONLY a raw valid JSON object. Do NOT wrap it in markdown code blocks (\`\`\`json). Do NOT provide any explanations.
+Valid JSON fields (all optional):
+- city: "Pune" | "Mumbai" | "Delhi" (or other city string)
 - area: string (locality name)
-- maxRent: number (monthly rent in INR)
+- maxRent: number (e.g. if user says "15k" or "under 15000", return 15000)
 - minRent: number
 - food: "veg" | "nonveg" | "both" | "none"
-- foodIncluded: boolean (true if food is mentioned as included)
+- foodIncluded: boolean (true if food is mentioned)
 - ac: boolean
 - gender: "male" | "female" | "any"
-- sharingType: "single" | "double" | "triple"
-No explanation, only JSON.`,
+- sharingType: "single" | "double" | "triple"`,
           },
           { role: 'user', content: q },
         ],
         temperature: 0.1,
         max_tokens: 200,
+        response_format: { type: 'json_object' }
       });
 
-      const raw = completion.choices[0]?.message?.content?.trim();
+      let raw = completion.choices[0]?.message?.content?.trim() || '{}';
+      // Strip markdown code block wrappers if the model ignores instructions
+      raw = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
       intentParams = JSON.parse(raw);
-    } catch (_) {
+    } catch (error) {
+      console.error("AI Search Error:", error);
       // Fallback to keyword search
       intentParams = { q };
     }

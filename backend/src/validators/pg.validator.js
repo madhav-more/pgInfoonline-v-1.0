@@ -21,6 +21,21 @@ const createPGSchema = z.object({
   contactWhatsapp: z.string().regex(/^[6-9]\d{9}$/).optional().or(z.literal('')),
   isAvailable: z.coerce.boolean().default(true),
   availableRooms: z.coerce.number().min(0).default(0),
+  photos: z.array(
+    z.object({
+      url: z.string().url('Enter a valid photo URL'),
+      publicId: z.string(),
+      isMain: z.boolean().default(false),
+      _id: z.string().optional(),
+    })
+  ).optional(),
+  videos: z.array(
+    z.object({
+      url: z.string().url('Enter a valid video URL'),
+      publicId: z.string(),
+      _id: z.string().optional(),
+    })
+  ).optional(),
 });
 
 const updatePGSchema = createPGSchema.partial();

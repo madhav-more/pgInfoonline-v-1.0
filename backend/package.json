@@ -35,6 +35,9 @@
     "booking",
     "real-estate"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "author": "PGinfo.online",
   "license": "MIT"
 }

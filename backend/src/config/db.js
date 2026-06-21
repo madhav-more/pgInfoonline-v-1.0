@@ -3,8 +3,11 @@ const { logger } = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    console.log(process.env.MONGODB_URI);
-    const conn = await mongoose.connect("mongodb+srv://madhavmore23445_db_user:raghav123@cluster0.fgf42m2.mongodb.net/pgOnlineee");
+    const dbUri = process.env.MONGODB_URI;
+    if (!dbUri) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+    const conn = await mongoose.connect(dbUri);
     logger.info(`✅ MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
     logger.error(`❌ MongoDB connection failed: ${error.message}`);

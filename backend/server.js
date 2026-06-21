@@ -14,12 +14,17 @@ const { logger } = require('./src/utils/logger');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ─── Trust Proxy for Render ──────────────────────────────────────────────────
+// Behind Render's load balancer, client IP is in X-Forwarded-For.
+// Enabling trust proxy ensures express-rate-limit identifies unique clients.
+app.set('trust proxy', 1);
+
 // ─── Connect Database ─────────────────────────────────────────────────────────
 connectDB();
 
 // ─── Security Middleware ──────────────────────────────────────────────────────
-// app.use(helmet());
-// app.use(mongoSanitize());
+app.use(helmet());
+app.use(mongoSanitize());
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 const limiter = rateLimit({
@@ -30,8 +35,12 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173', 'http://localhost:8081'];
+
 app.use(cors({
-  origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:8081'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
