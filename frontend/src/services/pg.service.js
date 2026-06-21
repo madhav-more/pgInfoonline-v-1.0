@@ -32,6 +32,10 @@ export const pgService = {
     });
     return res.data.data.images;
   },
+  deleteImage: async (pgId, publicId) => {
+    const res = await api.delete(`/upload/image/${pgId}`, { data: { publicId } });
+    return res.data.data;
+  },
 };
 
 export default pgService;

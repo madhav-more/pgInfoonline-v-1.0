@@ -15,6 +15,7 @@ import Analytics from './screens/admin/Analytics';
 import OwnerDashboard from './screens/owner/Dashboard';
 import MyListings from './screens/owner/MyListings';
 import AddPG from './screens/owner/AddPG';
+import EditPG from './screens/owner/EditPG';
 import Leads from './screens/owner/Leads';
 import Visits from './screens/owner/Visits';
 
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/owner/dashboard" element={<PrivateRoute allowedRoles={['owner']}><OwnerDashboard /></PrivateRoute>} />
         <Route path="/owner/listings" element={<PrivateRoute allowedRoles={['owner']}><MyListings /></PrivateRoute>} />
         <Route path="/owner/listings/add" element={<PrivateRoute allowedRoles={['owner']}><AddPG /></PrivateRoute>} />
+        <Route path="/owner/listings/:id/edit" element={<PrivateRoute allowedRoles={['owner']}><EditPG /></PrivateRoute>} />
         <Route path="/owner/leads" element={<PrivateRoute allowedRoles={['owner']}><Leads /></PrivateRoute>} />
         <Route path="/owner/visits" element={<PrivateRoute allowedRoles={['owner']}><Visits /></PrivateRoute>} />
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Upload, X, Image, Star } from 'lucide-react';
 import pgService from '../../services/pg.service';
 import toast from 'react-hot-toast';
@@ -15,6 +15,10 @@ export default function ImageUploader({ pgId, currentPhotos = [], onUploaded, ma
   const [uploading, setUploading] = useState(false);
   const [localPhotos, setLocalPhotos] = useState(currentPhotos);
   const fileRef = useRef();
+
+  useEffect(() => {
+    setLocalPhotos(currentPhotos);
+  }, [currentPhotos]);
 
   const handleFiles = async (files) => {
     const fileArr = Array.from(files);
@@ -39,8 +43,31 @@ export default function ImageUploader({ pgId, currentPhotos = [], onUploaded, ma
     }
   };
 
-  const removePhoto = (publicId) => {
+  const removePhoto = async (publicId) => {
+    if (pgId) {
+      setUploading(true);
+      try {
+        await pgService.deleteImage(pgId, publicId);
+        toast.success('Photo removed successfully');
+      } catch (err) {
+        toast.error('Failed to remove photo: ' + err.message);
+        setUploading(false);
+        return;
+      }
+    }
     const updated = localPhotos.filter((p) => p.publicId !== publicId);
+    setLocalPhotos(updated);
+    onUploaded?.(updated);
+    if (pgId) {
+      setUploading(false);
+    }
+  };
+
+  const setMainPhoto = (publicId) => {
+    const updated = localPhotos.map((p) => ({
+      ...p,
+      isMain: p.publicId === publicId,
+    }));
     setLocalPhotos(updated);
     onUploaded?.(updated);
   };
@@ -92,6 +119,20 @@ export default function ImageUploader({ pgId, currentPhotos = [], onUploaded, ma
               border: photo.isMain ? '2px solid #4f46e5' : '1px solid #e5e7eb',
             }}>
               <img src={photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button
+                type="button"
+                onClick={() => setMainPhoto(photo.publicId)}
+                style={{
+                  position: 'absolute', top: 4, left: 4, width: 20, height: 20,
+                  borderRadius: '50%', background: photo.isMain ? '#4f46e5' : 'rgba(0,0,0,0.55)',
+                  color: '#fff', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                title={photo.isMain ? 'Main cover photo' : 'Set as main cover'}
+              >
+                <Star size={10} fill={photo.isMain ? '#fff' : 'none'} color="#fff" />
+              </button>
               {photo.isMain && (
                 <div style={{
                   position: 'absolute', bottom: 4, left: 4,
@@ -99,10 +140,11 @@ export default function ImageUploader({ pgId, currentPhotos = [], onUploaded, ma
                   padding: '2px 6px', fontSize: 10, color: '#fff', fontWeight: 600,
                   display: 'flex', alignItems: 'center', gap: 3,
                 }}>
-                  <Star size={9} /> Main
+                  Main
                 </div>
               )}
               <button
+                type="button"
                 onClick={() => removePhoto(photo.publicId)}
                 style={{
                   position: 'absolute', top: 4, right: 4, width: 20, height: 20,
@@ -120,7 +162,7 @@ export default function ImageUploader({ pgId, currentPhotos = [], onUploaded, ma
 
       {localPhotos.length > 0 && (
         <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
-          {localPhotos.length} / {maxFiles} photos · First photo is the main cover image
+          {localPhotos.length} / {maxFiles} photos · Click the star icon to set the main cover image
         </p>
       )}
     </div>
